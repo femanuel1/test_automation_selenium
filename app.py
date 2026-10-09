@@ -7,7 +7,7 @@ text_url_array = {
     constants.PORTFOLIO_TEXT: constants.PORTFOLIO_URL,
     constants.SERVICES_TEXT: constants.SERVICES_URL,
     constants.CONTACT_TEXT: constants.CONTACT_URL,
-    constants.HOME_TEXT: constants.HOME_URL 
+    constants.HOME_TEXT: constants.HOME_URL
 }
 
 #Try and loop through an array 
