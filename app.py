@@ -7,23 +7,28 @@ import platform
 import time
 import os
 
-# Create the logs directory
-os.makedirs("logs", exist_ok=True)
+# Create the logs directory inside the project
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # Configure logging
 now = datetime.now()
 timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
 
-log_filename = f"logs/LOG_FILE_{timestamp}.txt"
+log_filename = os.path.join(
+    LOG_DIR,
+    f"LOG_FILE_{timestamp}.txt"
+)
 
 logging.basicConfig(
     filename=log_filename,
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True
 )
 
-# Create an array of the texts and URLs as well so that they are looped through in the test.
 text_url_array = {
     constants.HOME_TEXT: constants.HOME_URL,
     constants.ABOUT_TEXT: constants.ABOUT_URL,
@@ -32,7 +37,6 @@ text_url_array = {
     constants.CONTACT_TEXT: constants.CONTACT_URL
 }
 
-# Counters for final summary
 total_tests = 0
 passed_tests = 0
 failed_tests = 0
@@ -40,7 +44,6 @@ failed_tests = 0
 run_start = time.perf_counter()
 
 try:
-    # Write run header
     browser_info = functions.driver.capabilities
     browser_name = browser_info.get("browserName", "Unknown")
     browser_version = browser_info.get("browserVersion", "Unknown")
@@ -51,14 +54,12 @@ try:
         f"OS: {platform.system()} {platform.release()}"
     )
 
-    # Try and loop through an array
     for index, (test_name, test_url) in enumerate(
         text_url_array.items(), start=1
     ):
         test_id = f"TC-{index:02d}"
         start_time = time.perf_counter()
 
-        # Call the function that performs the actual test
         test_results = functions.test_click_item(
             constants.TEST_URL, test_url, test_name
         )
@@ -90,11 +91,9 @@ try:
                 f"Duration: {duration:.2f} s"
             )
 
-        print(
-            f"Test {test_id} - {test_name}: {test_results}"
-        )
+        print(f"TC-{index:02d}: {test_name} - {test_results}")
 
-    # STEP 2: Test unavailable URL ONLY ONCE
+    # Undefined URL test runs only once
     print("\nStarting undefined URL test...")
 
     start_time = time.perf_counter()
@@ -138,7 +137,6 @@ try:
     print(f"TC-06: Undefined URL - {undefined_result}")
 
 finally:
-    # Write run summary
     total_duration = time.perf_counter() - run_start
 
     logging.info(
