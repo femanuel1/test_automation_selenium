@@ -2,8 +2,28 @@
 from includes import functions
 from includes import constants
 from datetime import datetime
+import logging
+import platform
+import time
+import os
 
-#Create an array of the texts and URLs as well so that they are looped through in the test.
+# Create the logs directory
+os.makedirs("logs", exist_ok=True)
+
+# Configure logging
+now = datetime.now()
+timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
+
+log_filename = f"logs/LOG_FILE_{timestamp}.txt"
+
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+# Create an array of the texts and URLs as well so that they are looped through in the test.
 text_url_array = {
     constants.HOME_TEXT: constants.HOME_URL,
     constants.ABOUT_TEXT: constants.ABOUT_URL,
@@ -12,61 +32,127 @@ text_url_array = {
     constants.CONTACT_TEXT: constants.CONTACT_URL
 }
 
-#Try and loop through an array
-for test_name, test_url in text_url_array.items():
-    #Call the function that it to perform the actual test
-    test_results = functions.test_click_item(constants.TEST_URL,test_url, test_name)
-    print(f"All tests have been completed. Please check the log file for details. {test_results}")
+# Counters for final summary
+total_tests = 0
+passed_tests = 0
+failed_tests = 0
 
-    #Create a log file to hold the test results. The log file will be created in the logs directory with a timestamp in the filename.
-    now = datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
+run_start = time.perf_counter()
 
-    lines_of_text = [
-        f"Test Title:{test_name}\n",
-        f"Test URL:{test_url}\n",
-        f"Target URL:{text_url_array}\n",
-        f"Result:{test_results}\n"
-        f"Time of test:{now}\n",
-        f"----------------------------------------\n"
-    ]
+try:
+    # Write run header
+    browser_info = functions.driver.capabilities
+    browser_name = browser_info.get("browserName", "Unknown")
+    browser_version = browser_info.get("browserVersion", "Unknown")
 
-    #Write the lines of text to a log file
-    with open(f"logs/LOG_FILE_{timestamp}.txt", "w", encoding="utf-8") as file:
-        file.writelines(lines_of_text)
+    logging.info(
+        f"RUN START | Website: {constants.TEST_URL} | "
+        f"Browser: {browser_name} {browser_version} | "
+        f"OS: {platform.system()} {platform.release()}"
+    )
 
+    # Try and loop through an array
+    for index, (test_name, test_url) in enumerate(
+        text_url_array.items(), start=1
+    ):
+        test_id = f"TC-{index:02d}"
+        start_time = time.perf_counter()
 
-# STEP 2: NEW - Test unavailable URL
-# OUTSIDE THE LOOP - Runs only once
-print("\nStarting undefined URL test...")
+        # Call the function that performs the actual test
+        test_results = functions.test_click_item(
+            constants.TEST_URL, test_url, test_name
+        )
 
-undefined_result = functions.test_undefined_url(
-    constants.UNDEFINED_URL
-)
+        duration = time.perf_counter() - start_time
+        total_tests += 1
 
-print(f"Undefined URL test: {undefined_result}")
+        if test_results == "PASS":
+            passed_tests += 1
+            log_level = logging.INFO
+        else:
+            failed_tests += 1
+            log_level = logging.ERROR
 
-# STEP 3: NEW - Log undefined URL test
-now = datetime.now()
-timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
+        logging.log(
+            log_level,
+            f"{test_id} | Click {test_name} | "
+            f"Expected: {test_url} | "
+            f"Actual: {functions.last_actual} | "
+            f"Status: {test_results} | "
+            f"Duration: {duration:.2f} s | "
+            f"Page URL: {functions.driver.current_url} | "
+            f"Error: {functions.last_error or 'None'}"
+        )
 
-lines_of_text = [
-    "Test Title: Undefined URL Test\n",
-    f"Test URL: {constants.UNDEFINED_URL}\n",
-    "Expected HTTP Status: 404\n",
-    f"Result: {undefined_result}\n",
-    f"Time of test: {now}\n",
-    "----------------------------------------\n"
-]
+        if duration > 10:
+            logging.warning(
+                f"{test_id} | Slow test execution | "
+                f"Duration: {duration:.2f} s"
+            )
 
-with open(
-    f"logs/LOG_FILE_{timestamp}.txt",
-    "w",
-    encoding="utf-8"
-) as file:
-    file.writelines(lines_of_text)
+        print(
+            f"Test {test_id} - {test_name}: {test_results}"
+        )
 
+    # STEP 2: Test unavailable URL ONLY ONCE
+    print("\nStarting undefined URL test...")
 
-#Close the test activities after the test
-print(f"End of test for all items. Closing the browser now...")
-functions.close_browser()
+    start_time = time.perf_counter()
+
+    undefined_result = functions.test_undefined_url(
+        constants.UNDEFINED_URL
+    )
+
+    duration = time.perf_counter() - start_time
+    total_tests += 1
+
+    if undefined_result == "PASS":
+        passed_tests += 1
+        log_level = logging.INFO
+    else:
+        failed_tests += 1
+        log_level = logging.ERROR
+
+    screenshot_path = os.path.abspath(
+        "screenshots/undefined_page.png"
+    )
+
+    logging.log(
+        log_level,
+        f"TC-06 | Undefined URL Test | "
+        f"Expected: HTTP 404 | "
+        f"Actual: {functions.last_actual} | "
+        f"Status: {undefined_result} | "
+        f"Duration: {duration:.2f} s | "
+        f"Page URL: {functions.driver.current_url} | "
+        f"Screenshot: {screenshot_path if os.path.isfile(screenshot_path) else 'Not available'} | "
+        f"Error: {functions.last_error or 'None'}"
+    )
+
+    if duration > 10:
+        logging.warning(
+            f"TC-06 | Slow test execution | "
+            f"Duration: {duration:.2f} s"
+        )
+
+    print(f"TC-06: Undefined URL - {undefined_result}")
+
+finally:
+    # Write run summary
+    total_duration = time.perf_counter() - run_start
+
+    logging.info(
+        f"RUN END | Total: {total_tests} | "
+        f"Passed: {passed_tests} | "
+        f"Failed: {failed_tests} | "
+        f"Duration: {total_duration:.2f} s"
+    )
+
+    print("\nTEST EXECUTION SUMMARY")
+    print(f"Total tests: {total_tests}")
+    print(f"Passed: {passed_tests}")
+    print(f"Failed: {failed_tests}")
+    print(f"Duration: {total_duration:.2f} seconds")
+    print(f"Log file: {log_filename}")
+
+    functions.close_browser()
